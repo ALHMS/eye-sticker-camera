@@ -3,34 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>リアル目玉シールカメラ V9 (非同期AI読込)</title>
+    <title>リアル目玉シールカメラ V10 (パネル移動・開閉対応)</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             overflow: hidden; background: #000; font-family: sans-serif;
-            touch-action: none;
+            touch-action: none; /* スワイプによるスクロールを無効化 */
         }
         #app-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
         #camera-video { width: 100%; height: 100%; object-fit: cover; }
 
-        /* コントロールパネル */
+        /* --- コントロールパネル本体 --- */
         #control-panel {
             position: absolute; top: 10px; left: 10px;
             background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(1px);
-            padding: 12px; border-radius: 12px;
-            display: flex; flex-direction: column; gap: 8px;
-            z-index: 10; box-shadow: 0 6px 15px rgba(0,0,0,0.2);
-            max-height: 80vh; overflow-y: auto; width: 220px;
+            border-radius: 12px;
+            display: flex; flex-direction: column;
+            z-index: 20; /* 目玉より確実に上に配置 */
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            width: 230px;
         }
+
+        /* パネル移動用のドラッグハンドル */
+        #panel-drag-handle {
+            cursor: grab;
+            padding: 10px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            color: #222;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 12px 12px 0 0;
+            user-select: none;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        #panel-drag-handle:active { cursor: grabbing; }
+
+        /* パネル全体のアコーディオン */
+        details.main-accordion { padding: 10px; }
+        details.main-accordion summary {
+            font-size: 13px; font-weight: bold; color: #222;
+            cursor: pointer; outline: none; user-select: none; list-style: none;
+            text-align: center;
+        }
+        details.main-accordion summary::-webkit-details-marker { display: none; }
+        details.main-accordion summary::after { content: " ▼"; font-size: 11px; }
+        details.main-accordion[open] summary::after { content: " ▲"; }
+        
+        /* パネルの中身のスクロール領域 */
+        .panel-content {
+            max-height: 55vh; /* 画面が小さい端末でもスクロールできるように */
+            overflow-y: auto;
+            margin-top: 10px;
+            padding-right: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .panel-section { border-bottom: 1px solid rgba(0,0,0,0.2); padding-bottom: 5px; margin-bottom: 5px; }
         .panel-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #222; display: flex; justify-content: space-between; align-items: center; }
         
-        details.accordion { border-top: 1px solid rgba(0,0,0,0.2); padding-top: 5px; }
-        details.accordion summary { font-size: 12px; font-weight: bold; color: #222; cursor: pointer; outline: none; user-select: none; list-style: none; }
-        details.accordion summary::-webkit-details-marker { display: none; }
-        details.accordion summary::after { content: " ▼"; font-size: 10px; float: right; margin-top: 2px; }
-        details.accordion[open] summary::after { content: " ▲"; }
-        .accordion-content { margin-top: 10px; }
+        details.sub-accordion { border-top: 1px solid rgba(0,0,0,0.2); padding-top: 5px; }
+        details.sub-accordion summary { font-size: 12px; font-weight: bold; color: #222; cursor: pointer; outline: none; user-select: none; list-style: none; }
+        details.sub-accordion summary::-webkit-details-marker { display: none; }
+        details.sub-accordion summary::after { content: " ▼"; font-size: 10px; float: right; margin-top: 2px; }
+        details.sub-accordion[open] summary::after { content: " ▲"; }
+        .sub-accordion-content { margin-top: 10px; }
 
         .slider-group { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: bold; color: #111; margin-bottom: 4px; }
         .slider-group input[type="range"] { width: 100px; }
@@ -86,39 +125,48 @@
     <video id="camera-video" autoplay playsinline></video>
     
     <div id="control-panel">
-        <div class="panel-section" style="background: rgba(255,255,255,0.4); padding: 8px; border-radius: 8px;">
-            <span class="panel-title">
-                自動顔認識
-                <span id="ai-status" style="font-size:9px; color:#ff5722;">モデル読込中...</span>
-            </span>
-            <div class="slider-group">
-                <label>追従モード</label>
-                <label class="switch">
-                    <input type="checkbox" id="auto-track-toggle" disabled>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <div class="panel-section" style="border:none;">
-            <span class="panel-title">全体サイズ</span>
-            <div class="slider-group"><label>カプセル</label><input type="range" id="white-slider" min="10" max="120" value="70"></div>
-            <div class="slider-group"><label>黒目(割合)</label><input type="range" id="black-ratio-slider" min="10" max="90" value="45"></div>
-        </div>
-
-        <details class="accordion">
-            <summary>黒目の位置微調整</summary>
-            <div class="accordion-content">
-                <div class="panel-section">
-                    <span class="panel-title">左目</span>
-                    <div class="slider-group"><label>左右</label><input type="range" id="lx-slider" min="-50" max="50" value="0"></div>
-                    <div class="slider-group"><label>上下</label><input type="range" id="ly-slider" min="-50" max="50" value="0"></div>
+        <div id="panel-drag-handle">⠿ ドラッグして移動</div>
+        
+        <details class="main-accordion" open>
+            <summary>設定を開閉</summary>
+            <div class="panel-content">
+                
+                <div class="panel-section" style="background: rgba(255,255,255,0.4); padding: 8px; border-radius: 8px;">
+                    <span class="panel-title">
+                        自動顔認識
+                        <span id="ai-status" style="font-size:9px; color:#ff5722;">モデル読込中...</span>
+                    </span>
+                    <div class="slider-group">
+                        <label>追従モード</label>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-track-toggle" disabled>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
-                <div class="panel-section" style="border:none; padding-bottom:0; margin-bottom:0;">
-                    <span class="panel-title">右目</span>
-                    <div class="slider-group"><label>左右</label><input type="range" id="rx-slider" min="-50" max="50" value="0"></div>
-                    <div class="slider-group"><label>上下</label><input type="range" id="ry-slider" min="-50" max="50" value="0"></div>
+
+                <div class="panel-section" style="border:none;">
+                    <span class="panel-title">全体サイズ</span>
+                    <div class="slider-group"><label>カプセル</label><input type="range" id="white-slider" min="10" max="120" value="70"></div>
+                    <div class="slider-group"><label>黒目(割合)</label><input type="range" id="black-ratio-slider" min="10" max="90" value="45"></div>
                 </div>
+
+                <details class="sub-accordion">
+                    <summary>黒目の位置微調整</summary>
+                    <div class="sub-accordion-content">
+                        <div class="panel-section">
+                            <span class="panel-title">左目</span>
+                            <div class="slider-group"><label>左右</label><input type="range" id="lx-slider" min="-50" max="50" value="0"></div>
+                            <div class="slider-group"><label>上下</label><input type="range" id="ly-slider" min="-50" max="50" value="0"></div>
+                        </div>
+                        <div class="panel-section" style="border:none; padding-bottom:0; margin-bottom:0;">
+                            <span class="panel-title">右目</span>
+                            <div class="slider-group"><label>左右</label><input type="range" id="rx-slider" min="-50" max="50" value="0"></div>
+                            <div class="slider-group"><label>上下</label><input type="range" id="ry-slider" min="-50" max="50" value="0"></div>
+                        </div>
+                    </div>
+                </details>
+
             </div>
         </details>
     </div>
@@ -158,10 +206,36 @@
     const trackToggle = document.getElementById('auto-track-toggle');
     const aiStatus = document.getElementById('ai-status');
 
-    // --- AIの非同期読み込み (Dynamic Import) ---
+    // --- パネルのドラッグ移動処理 ---
+    const panel = document.getElementById('control-panel');
+    const panelHandle = document.getElementById('panel-drag-handle');
+    let isPanelDragging = false;
+    let panelOffsetX = 0, panelOffsetY = 0;
+
+    panelHandle.addEventListener('pointerdown', (e) => {
+        isPanelDragging = true;
+        panelHandle.setPointerCapture(e.pointerId);
+        const rect = panel.getBoundingClientRect();
+        // クリックした位置とパネル左上の座標の差分を記録
+        panelOffsetX = e.clientX - rect.left;
+        panelOffsetY = e.clientY - rect.top;
+    });
+
+    panelHandle.addEventListener('pointermove', (e) => {
+        if (!isPanelDragging) return;
+        panel.style.left = (e.clientX - panelOffsetX) + 'px';
+        panel.style.top = (e.clientY - panelOffsetY) + 'px';
+    });
+
+    panelHandle.addEventListener('pointerup', (e) => {
+        isPanelDragging = false;
+        panelHandle.releasePointerCapture(e.pointerId);
+    });
+    // -----------------------------
+
+    // AIの非同期読み込み
     async function initAI() {
         try {
-            // URL末尾を .mjs に修正し、import() 関数でバックグラウンド実行
             const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs");
             const { FaceLandmarker, FilesetResolver } = vision;
 
@@ -183,8 +257,6 @@
             console.error("AIモデルの読み込みに失敗しました:", e);
         }
     }
-    
-    // AIの初期化をバックグラウンドで開始（ここで処理は止まりません）
     initAI();
 
     trackToggle.addEventListener('change', (e) => {
