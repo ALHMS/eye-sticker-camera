@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>目玉シールカメラ V4</title>
+    <title>リアル目玉シールカメラ V5</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -16,36 +16,24 @@
         /* コントロールパネル */
         #control-panel {
             position: absolute; top: 10px; left: 10px;
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(10px);
             padding: 12px; border-radius: 12px;
             display: flex; flex-direction: column; gap: 8px;
-            z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 10; box-shadow: 0 6px 15px rgba(0,0,0,0.2);
             max-height: 80vh; overflow-y: auto; width: 220px;
         }
         .panel-section { border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px; margin-bottom: 5px; }
         .panel-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; display: block; }
         
-        /* アコーディオン（折りたたみ）のスタイル */
-        details.accordion {
-            border-top: 1px solid rgba(0,0,0,0.1);
-            padding-top: 5px;
-        }
+        details.accordion { border-top: 1px solid rgba(0,0,0,0.1); padding-top: 5px; }
         details.accordion summary {
             font-size: 12px; font-weight: bold; color: #555;
-            cursor: pointer; outline: none; user-select: none;
-            list-style: none; /* デフォルトの矢印を消す */
+            cursor: pointer; outline: none; user-select: none; list-style: none;
         }
-        details.accordion summary::-webkit-details-marker {
-            display: none; /* Safariの矢印を消す */
-        }
-        /* オリジナルの開閉アイコン */
-        details.accordion summary::after {
-            content: " ▼"; font-size: 10px; float: right; margin-top: 2px;
-        }
-        details.accordion[open] summary::after {
-            content: " ▲";
-        }
+        details.accordion summary::-webkit-details-marker { display: none; }
+        details.accordion summary::after { content: " ▼"; font-size: 10px; float: right; margin-top: 2px; }
+        details.accordion[open] summary::after { content: " ▲"; }
         .accordion-content { margin-top: 10px; }
 
         .slider-group {
@@ -54,32 +42,75 @@
         }
         .slider-group input { width: 100px; }
 
-        /* 目玉シール */
+        /* --- リアル目玉シール (カプセル) --- */
         .eye {
-            position: absolute; background: white; border-radius: 50%;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4); cursor: grab;
-            transform: translate(-50%, -50%); z-index: 5;
+            position: absolute;
+            /* カプセルの透明感と光沢をグラデーションで表現 */
+            background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.12) 100%);
+            border-radius: 50%;
+            /* 立体感を出すためのエッジ */
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            /* 立体的な影 */
+            box-shadow: 2px 5px 15px rgba(0,0,0,0.5), inset 0 -3px 5px rgba(0,0,0,0.2);
+            cursor: grab;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            overflow: visible; /* 擬似要素を表示するため */
         }
+        
+        /* 擬似要素 ::before でカプセルの底にある白目を表現 */
+        .eye::before {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px; /* borderの内側 */
+            background: white;
+            border-radius: 50%;
+            z-index: -1; /* カプセル(本体)の下に配置 */
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1); /* 白目の縁の影 */
+        }
+
+        /* 擬似要素 ::after でカプセル表面の強いハイライトを表現 */
+        .eye::after {
+            content: '';
+            position: absolute;
+            top: 15%; left: 15%;
+            width: 30%; height: 30%;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            filter: blur(1.5px); /* 少しぼかしてリアルに */
+            transform: rotate(-15deg);
+            z-index: 10; /* 黒目の上に配置 */
+            pointer-events: none;
+        }
+
         .pupil {
             position: absolute; background: black; border-radius: 50%;
-            top: 50%; left: 50%; pointer-events: none;
+            top: 50%; left: 50%;
+            pointer-events: none;
+            z-index: 5; /* カプセル::beforeの上、::afterの下 */
+            /* 黒目の立体感 */
+            box-shadow: inset 0 0 4px rgba(255,255,255,0.3);
         }
 
         #shutter-btn {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             width: 70px; height: 70px; background: #fff;
             border: 6px solid #ddd; border-radius: 50%; z-index: 10;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
+        #shutter-btn:active { background: #eee; transform: translateX(-50%) scale(0.95); }
+        
         #start-screen {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 100;
         }
-        #start-btn { padding: 15px 30px; font-size: 18px; border-radius: 30px; border: none; background: #ffeb3b; }
+        #start-btn { padding: 15px 30px; font-size: 18px; border-radius: 30px; border: none; background: #ffeb3b; color: #333; font-weight: bold; }
+        
         #preview-screen {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             background: #000; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 50;
         }
-        #preview-img { max-width: 90%; max-height: 75%; border-radius: 10px; }
+        #preview-img { max-width: 90%; max-height: 75%; border-radius: 10px; border: 2px solid white; }
         .preview-controls { margin-top: 20px; display: flex; gap: 20px; }
     </style>
 </head>
@@ -92,7 +123,7 @@
         <div class="panel-section" style="border:none;">
             <span class="panel-title">全体サイズ</span>
             <div class="slider-group">
-                <label>白目</label>
+                <label>カプセル</label>
                 <input type="range" id="white-slider" min="10" max="120" value="80">
             </div>
             <div class="slider-group">
@@ -137,14 +168,14 @@
     <button id="shutter-btn"></button>
 
     <div id="start-screen">
-        <button id="start-btn">スタート</button>
+        <button id="start-btn">スタート<br><small>(カメラとセンサーの許可)</small></button>
     </div>
 
     <div id="preview-screen">
         <img id="preview-img" src="">
         <div class="preview-controls">
-            <button id="close-btn" style="padding:10px 20px;">戻る</button>
-            <button id="download-btn" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:20px;">保存</button>
+            <button id="close-btn" style="padding:10px 20px; background:#ddd; border:none; border-radius:20px;">戻る</button>
+            <button id="download-btn" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:20px; font-weight:bold;">画像を保存</button>
         </div>
     </div>
 </div>
@@ -152,7 +183,6 @@
 <script>
     let whiteSize = 80;
     let blackSize = 40;
-    
     let offsets = [ { x: 0, y: 0 }, { x: 0, y: 0 } ];
 
     const whiteSlider = document.getElementById('white-slider');
@@ -228,10 +258,8 @@
 
             p.vx -= ax * 1.5;
             p.vy += ay * 1.5;
-
             p.vx -= (p.x - targetX) * 0.1;
             p.vy -= (p.y - targetY) * 0.1;
-
             p.vx *= 0.8;
             p.vy *= 0.8;
             p.x += p.vx;
@@ -266,12 +294,14 @@
         updatePhysics();
     });
 
+    // シャッター（Canvas描画）をリアルな見た目にアップデート
     document.getElementById('shutter-btn').addEventListener('click', () => {
         const canvas = document.createElement('canvas');
         const rect = document.getElementById('app-container').getBoundingClientRect();
         canvas.width = rect.width; canvas.height = rect.height;
         const ctx = canvas.getContext('2d');
 
+        // ① カメラ映像描画
         const vRatio = video.videoWidth / video.videoHeight;
         const cRatio = canvas.width / canvas.height;
         let dw, dh, ox, oy;
@@ -279,21 +309,68 @@
         else { dw = canvas.width; dh = canvas.width / vRatio; ox = 0; oy = (canvas.height - dh) / 2; }
         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, ox, oy, dw, dh);
 
+        // ② 目玉（カプセル）描画
         for (let i = 0; i < 2; i++) {
             const eyeRect = eyes[i].getBoundingClientRect();
             const cx = eyeRect.left + eyeRect.width / 2;
             const cy = eyeRect.top + eyeRect.height / 2;
+            const radius = whiteSize / 2;
 
+            // 1. カプセルの立体的な影（drop-shadow）を描画
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.filter = 'blur(4px)'; // CSSのblurを模倣
+            ctx.beginPath();
+            ctx.arc(cx + 2, cy + 4, radius, 0, Math.PI * 2); // 影の位置をオフセット
+            ctx.fill();
+            ctx.restore();
+
+            // 2. 白目の底 (::before)
             ctx.fillStyle = 'white';
-            ctx.beginPath(); ctx.arc(cx, cy, whiteSize / 2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2); // borderの内側
+            ctx.fill();
 
+            // 3. カプセル本体の透明感と光沢 (background: radial-gradient)
+            ctx.save();
+            const capGrad = ctx.createRadialGradient(cx - radius*0.3, cy - radius*0.3, radius*0.1, cx, cy, radius);
+            capGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)'); // 光沢
+            capGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)'); // 透明
+            capGrad.addColorStop(1, 'rgba(0, 0, 0, 0.08)'); // 影
+            ctx.fillStyle = capGrad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 4. 黒目 (.pupil)
             const px = cx + physicsData[i].x;
             const py = cy + physicsData[i].y;
             ctx.fillStyle = 'black';
-            ctx.beginPath(); ctx.arc(px, py, blackSize / 2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath();
+            ctx.arc(px, py, blackSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 黒目の立体感（軽いハイライト）
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.arc(px - blackSize*0.2, py - blackSize*0.2, blackSize * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 5. カプセル表面の強いハイライト (::after)
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.filter = 'blur(1.5px)'; // CSSのfilter: blur
+            ctx.beginPath();
+            // 左上にオフセットされた白い楕円
+            ctx.ellipse(cx - radius*0.4, cy - radius*0.4, radius*0.3, radius*0.2, -Math.PI/12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         }
 
-        document.getElementById('preview-img').src = canvas.toDataURL('image/jpeg');
+        document.getElementById('preview-img').src = canvas.toDataURL('image/jpeg', 0.9);
         document.getElementById('preview-screen').style.display = 'flex';
     });
 
@@ -303,7 +380,7 @@
     document.getElementById('download-btn').addEventListener('click', () => {
         const a = document.createElement('a');
         a.href = document.getElementById('preview-img').src;
-        a.download = 'eye_photo.jpg';
+        a.download = 'real_eye_sticker_photo.jpg';
         a.click();
     });
 </script>
