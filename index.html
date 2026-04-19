@@ -264,10 +264,10 @@
     ];
 
     window.addEventListener('devicemotion', (e) => {
-        if (e.accelerationIncludingGravity) {
-            // デバイスを傾けた際の重力と振った際の加速度を反映
-            ax = e.accelerationIncludingGravity.x || 0;
-            ay = e.accelerationIncludingGravity.y || 0;
+        // 修正点：重力（傾き）を含まない、純粋な「揺れ（加速度）」だけを取得します
+        if (e.acceleration) {
+            ax = e.acceleration.x || 0;
+            ay = e.acceleration.y || 0;
         }
     });
 
@@ -277,9 +277,13 @@
         for (let i = 0; i < 2; i++) {
             let p = physicsData[i];
             
-            // X/Y軸の加速度を速度に加算（端末によって極性が違う場合がありますが、揺らす目的なのでOK）
-            p.vx -= ax * 0.8;
-            p.vy += ay * 0.8;
+            // X/Y軸の加速度（揺れ）を速度に加算（感度を少し上げています）
+            p.vx -= ax * 1.5;
+            p.vy += ay * 1.5;
+
+            // 修正点：黒目が自然に真ん中へ戻るようにする「バネの力」を追加
+            p.vx -= p.x * 0.08;
+            p.vy -= p.y * 0.08;
 
             // 摩擦・減衰
             p.vx *= 0.85;
