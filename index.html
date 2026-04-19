@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>リアル目玉シールカメラ V8 (アウトカメラ版)</title>
+    <title>リアル目玉シールカメラ V9 (非同期AI読込)</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -11,8 +11,6 @@
             touch-action: none;
         }
         #app-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-        
-        /* インカメラ用の反転を解除 */
         #camera-video { width: 100%; height: 100%; object-fit: cover; }
 
         /* コントロールパネル */
@@ -143,9 +141,7 @@
     </div>
 </div>
 
-<script type="module">
-    import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
-
+<script>
     let whiteSize = 70, blackSize = 31.5;
     let offsets = [ { x: 0, y: 0 }, { x: 0, y: 0 } ];
     let faceLandmarker = null;
@@ -162,10 +158,15 @@
     const trackToggle = document.getElementById('auto-track-toggle');
     const aiStatus = document.getElementById('ai-status');
 
+    // --- AIの非同期読み込み (Dynamic Import) ---
     async function initAI() {
         try {
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+            // URL末尾を .mjs に修正し、import() 関数でバックグラウンド実行
+            const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs");
+            const { FaceLandmarker, FilesetResolver } = vision;
+
+            const resolver = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+            faceLandmarker = await FaceLandmarker.createFromOptions(resolver, {
                 baseOptions: {
                     modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
                     delegate: "GPU"
@@ -182,6 +183,8 @@
             console.error("AIモデルの読み込みに失敗しました:", e);
         }
     }
+    
+    // AIの初期化をバックグラウンドで開始（ここで処理は止まりません）
     initAI();
 
     trackToggle.addEventListener('change', (e) => {
@@ -232,12 +235,11 @@
                 
                 if (results.faceLandmarks && results.faceLandmarks.length > 0) {
                     const landmarks = results.faceLandmarks[0];
-                    // アウトカメラのため、468(相手の右目)は画面左側、473(相手の左目)は画面右側に映る
                     const personRightEyeLM = landmarks[468];
                     const personLeftEyeLM = landmarks[473];
                     
-                    updateEyePosition(eyes[0], personRightEyeLM); // 画面左側の目玉
-                    updateEyePosition(eyes[1], personLeftEyeLM);  // 画面右側の目玉
+                    updateEyePosition(eyes[0], personRightEyeLM);
+                    updateEyePosition(eyes[1], personLeftEyeLM);
                 }
             }
         }
@@ -269,7 +271,6 @@
         if (vRatio > cRatio) { rHeight = rect.height; rWidth = rect.height * vRatio; ox = (rect.width - rWidth) / 2; oy = 0; }
         else { rWidth = rect.width; rHeight = rect.width / vRatio; ox = 0; oy = (rect.height - rHeight) / 2; }
 
-        // インカメラ用のX座標の反転処理を削除し、そのまま描画
         const mappedX = ox + landmark.x * rWidth;
         const mappedY = oy + landmark.y * rHeight;
 
@@ -279,7 +280,6 @@
 
     async function startCamera() {
         try {
-            // facingModeを'environment'に戻す
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = stream;
         } catch(err) { alert('カメラエラー: ' + err.message); }
@@ -306,7 +306,6 @@
         if (vRatio > cRatio) { dh = canvas.height; dw = canvas.height * vRatio; ox = (canvas.width - dw) / 2; oy = 0; }
         else { dw = canvas.width; dh = canvas.width / vRatio; ox = 0; oy = (canvas.height - dh) / 2; }
         
-        // 映像の反転描画を削除
         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, ox, oy, dw, dh);
 
         for (let i = 0; i < 2; i++) {
