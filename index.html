@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>リアル目玉シールカメラ V6</title>
+    <title>リアル目玉シールカメラ V8 (アウトカメラ版)</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -11,100 +11,73 @@
             touch-action: none;
         }
         #app-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        
+        /* インカメラ用の反転を解除 */
         #camera-video { width: 100%; height: 100%; object-fit: cover; }
 
         /* コントロールパネル */
         #control-panel {
             position: absolute; top: 10px; left: 10px;
-            /* 透明度を上げ（0.3）、blurを1pxに変更 */
-            background: rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(1px);
+            background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(1px);
             padding: 12px; border-radius: 12px;
             display: flex; flex-direction: column; gap: 8px;
             z-index: 10; box-shadow: 0 6px 15px rgba(0,0,0,0.2);
             max-height: 80vh; overflow-y: auto; width: 220px;
         }
         .panel-section { border-bottom: 1px solid rgba(0,0,0,0.2); padding-bottom: 5px; margin-bottom: 5px; }
-        .panel-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #222; display: block; }
+        .panel-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #222; display: flex; justify-content: space-between; align-items: center; }
         
         details.accordion { border-top: 1px solid rgba(0,0,0,0.2); padding-top: 5px; }
-        details.accordion summary {
-            font-size: 12px; font-weight: bold; color: #222;
-            cursor: pointer; outline: none; user-select: none; list-style: none;
-        }
+        details.accordion summary { font-size: 12px; font-weight: bold; color: #222; cursor: pointer; outline: none; user-select: none; list-style: none; }
         details.accordion summary::-webkit-details-marker { display: none; }
         details.accordion summary::after { content: " ▼"; font-size: 10px; float: right; margin-top: 2px; }
         details.accordion[open] summary::after { content: " ▲"; }
         .accordion-content { margin-top: 10px; }
 
-        .slider-group {
-            display: flex; align-items: center; justify-content: space-between;
-            font-size: 11px; font-weight: bold; color: #111; margin-bottom: 4px;
-        }
-        .slider-group input { width: 100px; }
+        .slider-group { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: bold; color: #111; margin-bottom: 4px; }
+        .slider-group input[type="range"] { width: 100px; }
+
+        /* トグルスイッチのスタイル */
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #4CAF50; }
+        input:checked + .slider:before { transform: translateX(16px); }
+        input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
 
         /* --- リアル目玉シール (カプセル) --- */
         .eye {
             position: absolute;
             background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.12) 100%);
-            border-radius: 50%;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.3);
             box-shadow: 2px 5px 15px rgba(0,0,0,0.5), inset 0 -3px 5px rgba(0,0,0,0.2);
-            cursor: grab;
-            transform: translate(-50%, -50%);
-            z-index: 5;
-            overflow: visible;
+            cursor: grab; transform: translate(-50%, -50%); z-index: 5; overflow: visible;
         }
-        
         .eye::before {
-            content: '';
-            position: absolute;
-            top: 2px; left: 2px; right: 2px; bottom: 2px;
-            background: white;
-            border-radius: 50%;
-            z-index: -1;
-            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+            content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px;
+            background: white; border-radius: 50%; z-index: -1; box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
         }
-
         .eye::after {
-            content: '';
-            position: absolute;
-            top: 15%; left: 15%;
-            width: 30%; height: 30%;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            filter: blur(1.5px);
-            transform: rotate(-15deg);
-            z-index: 10;
-            pointer-events: none;
+            content: ''; position: absolute; top: 15%; left: 15%; width: 30%; height: 30%;
+            background: rgba(255, 255, 255, 0.8); border-radius: 50%; filter: blur(1.5px);
+            transform: rotate(-15deg); z-index: 10; pointer-events: none;
         }
-
         .pupil {
             position: absolute; background: black; border-radius: 50%;
-            top: 50%; left: 50%;
-            pointer-events: none;
-            z-index: 5;
-            box-shadow: inset 0 0 4px rgba(255,255,255,0.3);
+            top: 50%; left: 50%; pointer-events: none; z-index: 5; box-shadow: inset 0 0 4px rgba(255,255,255,0.3);
         }
 
         #shutter-btn {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 70px; height: 70px; background: #fff;
-            border: 6px solid #ddd; border-radius: 50%; z-index: 10;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            width: 70px; height: 70px; background: #fff; border: 6px solid #ddd; border-radius: 50%; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         #shutter-btn:active { background: #eee; transform: translateX(-50%) scale(0.95); }
         
-        #start-screen {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 100;
-        }
+        #start-screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 100; }
         #start-btn { padding: 15px 30px; font-size: 18px; border-radius: 30px; border: none; background: #ffeb3b; color: #333; font-weight: bold; }
         
-        #preview-screen {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: #000; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 50;
-        }
+        #preview-screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 50; }
         #preview-img { max-width: 90%; max-height: 75%; border-radius: 10px; border: 2px solid white; }
         .preview-controls { margin-top: 20px; display: flex; gap: 20px; }
     </style>
@@ -115,43 +88,38 @@
     <video id="camera-video" autoplay playsinline></video>
     
     <div id="control-panel">
-        <div class="panel-section" style="border:none;">
-            <span class="panel-title">全体サイズ</span>
+        <div class="panel-section" style="background: rgba(255,255,255,0.4); padding: 8px; border-radius: 8px;">
+            <span class="panel-title">
+                自動顔認識
+                <span id="ai-status" style="font-size:9px; color:#ff5722;">モデル読込中...</span>
+            </span>
             <div class="slider-group">
-                <label>カプセル</label>
-                <input type="range" id="white-slider" min="10" max="120" value="80">
-            </div>
-            <div class="slider-group">
-                <label>黒目(割合)</label>
-                <input type="range" id="black-ratio-slider" min="10" max="90" value="50">
+                <label>追従モード</label>
+                <label class="switch">
+                    <input type="checkbox" id="auto-track-toggle" disabled>
+                    <span class="slider"></span>
+                </label>
             </div>
         </div>
 
+        <div class="panel-section" style="border:none;">
+            <span class="panel-title">全体サイズ</span>
+            <div class="slider-group"><label>カプセル</label><input type="range" id="white-slider" min="10" max="120" value="70"></div>
+            <div class="slider-group"><label>黒目(割合)</label><input type="range" id="black-ratio-slider" min="10" max="90" value="45"></div>
+        </div>
+
         <details class="accordion">
-            <summary>位置微調整を開く</summary>
+            <summary>黒目の位置微調整</summary>
             <div class="accordion-content">
                 <div class="panel-section">
                     <span class="panel-title">左目</span>
-                    <div class="slider-group">
-                        <label>左右</label>
-                        <input type="range" id="lx-slider" min="-50" max="50" value="0">
-                    </div>
-                    <div class="slider-group">
-                        <label>上下</label>
-                        <input type="range" id="ly-slider" min="-50" max="50" value="0">
-                    </div>
+                    <div class="slider-group"><label>左右</label><input type="range" id="lx-slider" min="-50" max="50" value="0"></div>
+                    <div class="slider-group"><label>上下</label><input type="range" id="ly-slider" min="-50" max="50" value="0"></div>
                 </div>
-
                 <div class="panel-section" style="border:none; padding-bottom:0; margin-bottom:0;">
                     <span class="panel-title">右目</span>
-                    <div class="slider-group">
-                        <label>左右</label>
-                        <input type="range" id="rx-slider" min="-50" max="50" value="0">
-                    </div>
-                    <div class="slider-group">
-                        <label>上下</label>
-                        <input type="range" id="ry-slider" min="-50" max="50" value="0">
-                    </div>
+                    <div class="slider-group"><label>左右</label><input type="range" id="rx-slider" min="-50" max="50" value="0"></div>
+                    <div class="slider-group"><label>上下</label><input type="range" id="ry-slider" min="-50" max="50" value="0"></div>
                 </div>
             </div>
         </details>
@@ -170,67 +138,80 @@
         <img id="preview-img" src="">
         <div class="preview-controls">
             <button id="close-btn" style="padding:10px 20px; background:#ddd; border:none; border-radius:20px;">戻る</button>
-            <button id="download-btn" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:20px; font-weight:bold;">画像を保存</button>
+            <button id="download-btn" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:20px; font-weight:bold;">保存</button>
         </div>
     </div>
 </div>
 
-<script>
-    let whiteSize = 80;
-    let blackSize = 40;
+<script type="module">
+    import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
+
+    let whiteSize = 70, blackSize = 31.5;
     let offsets = [ { x: 0, y: 0 }, { x: 0, y: 0 } ];
+    let faceLandmarker = null;
+    let isTracking = false;
+    let lastVideoTime = -1;
 
     const whiteSlider = document.getElementById('white-slider');
     const blackRatioSlider = document.getElementById('black-ratio-slider');
-    const lxS = document.getElementById('lx-slider');
-    const lyS = document.getElementById('ly-slider');
-    const rxS = document.getElementById('rx-slider');
-    const ryS = document.getElementById('ry-slider');
-
+    const lxS = document.getElementById('lx-slider'); const lyS = document.getElementById('ly-slider');
+    const rxS = document.getElementById('rx-slider'); const ryS = document.getElementById('ry-slider');
     const eyes = [document.getElementById('eye1'), document.getElementById('eye2')];
     const pupils = [document.getElementById('pupil1'), document.getElementById('pupil2')];
     const video = document.getElementById('camera-video');
+    const trackToggle = document.getElementById('auto-track-toggle');
+    const aiStatus = document.getElementById('ai-status');
+
+    async function initAI() {
+        try {
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                    delegate: "GPU"
+                },
+                outputFaceBlendshapes: false,
+                runningMode: "VIDEO",
+                numFaces: 1
+            });
+            trackToggle.disabled = false;
+            aiStatus.textContent = "準備完了!";
+            aiStatus.style.color = "#4CAF50";
+        } catch (e) {
+            aiStatus.textContent = "読込エラー";
+            console.error("AIモデルの読み込みに失敗しました:", e);
+        }
+    }
+    initAI();
+
+    trackToggle.addEventListener('change', (e) => {
+        isTracking = e.target.checked;
+    });
 
     function updateParams() {
         whiteSize = parseInt(whiteSlider.value);
-        
-        // 白目のサイズとスライダーの割合(%)を掛け合わせて黒目のサイズを算出
         const ratio = parseInt(blackRatioSlider.value) / 100;
         blackSize = whiteSize * ratio;
-        
-        // カプセルをはみ出さないための最終セーフティ
-        if (blackSize > whiteSize - 4) {
-            blackSize = Math.max(2, whiteSize - 4);
-        }
+        if (blackSize > whiteSize - 4) blackSize = Math.max(2, whiteSize - 4);
 
-        offsets[0].x = (parseInt(lxS.value) / 100) * whiteSize;
-        offsets[0].y = (parseInt(lyS.value) / 100) * whiteSize;
-        offsets[1].x = (parseInt(rxS.value) / 100) * whiteSize;
-        offsets[1].y = (parseInt(ryS.value) / 100) * whiteSize;
+        offsets[0].x = (parseInt(lxS.value) / 100) * whiteSize; offsets[0].y = (parseInt(lyS.value) / 100) * whiteSize;
+        offsets[1].x = (parseInt(rxS.value) / 100) * whiteSize; offsets[1].y = (parseInt(ryS.value) / 100) * whiteSize;
 
-        eyes.forEach(eye => {
-            eye.style.width = whiteSize + 'px';
-            eye.style.height = whiteSize + 'px';
-        });
-
+        eyes.forEach(eye => { eye.style.width = whiteSize + 'px'; eye.style.height = whiteSize + 'px'; });
         pupils.forEach(pupil => {
-            pupil.style.width = blackSize + 'px';
-            pupil.style.height = blackSize + 'px';
-            pupil.style.marginTop = -(blackSize / 2) + 'px';
-            pupil.style.marginLeft = -(blackSize / 2) + 'px';
+            pupil.style.width = blackSize + 'px'; pupil.style.height = blackSize + 'px';
+            pupil.style.marginTop = -(blackSize / 2) + 'px'; pupil.style.marginLeft = -(blackSize / 2) + 'px';
         });
     }
-
     [whiteSlider, blackRatioSlider, lxS, lyS, rxS, ryS].forEach(s => s.addEventListener('input', updateParams));
     updateParams();
 
     function makeDraggable(el) {
         let isDragging = false;
-        el.addEventListener('pointerdown', (e) => { isDragging = true; el.setPointerCapture(e.pointerId); });
+        el.addEventListener('pointerdown', (e) => { if(isTracking) return; isDragging = true; el.setPointerCapture(e.pointerId); });
         el.addEventListener('pointermove', (e) => {
-            if (!isDragging) return;
-            el.style.left = e.clientX + 'px';
-            el.style.top = e.clientY + 'px';
+            if (!isDragging || isTracking) return;
+            el.style.left = e.clientX + 'px'; el.style.top = e.clientY + 'px';
         });
         el.addEventListener('pointerup', (e) => { isDragging = false; el.releasePointerCapture(e.pointerId); });
     }
@@ -238,46 +219,67 @@
 
     let ax = 0, ay = 0;
     const physicsData = [ { x: 0, y: 0, vx: 0, vy: 0 }, { x: 0, y: 0, vx: 0, vy: 0 } ];
-
     window.addEventListener('devicemotion', (e) => {
-        if (e.acceleration) {
-            ax = e.acceleration.x || 0;
-            ay = e.acceleration.y || 0;
-        }
+        if (e.acceleration) { ax = e.acceleration.x || 0; ay = e.acceleration.y || 0; }
     });
 
-    function updatePhysics() {
-        const maxRadius = (whiteSize - blackSize) / 2;
+    function renderLoop() {
+        if (isTracking && faceLandmarker && video.readyState >= 2) {
+            let startTimeMs = performance.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                const results = faceLandmarker.detectForVideo(video, startTimeMs);
+                
+                if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+                    const landmarks = results.faceLandmarks[0];
+                    // アウトカメラのため、468(相手の右目)は画面左側、473(相手の左目)は画面右側に映る
+                    const personRightEyeLM = landmarks[468];
+                    const personLeftEyeLM = landmarks[473];
+                    
+                    updateEyePosition(eyes[0], personRightEyeLM); // 画面左側の目玉
+                    updateEyePosition(eyes[1], personLeftEyeLM);  // 画面右側の目玉
+                }
+            }
+        }
 
+        const maxRadius = (whiteSize - blackSize) / 2;
         for (let i = 0; i < 2; i++) {
             let p = physicsData[i];
-            let targetX = offsets[i].x;
-            let targetY = offsets[i].y;
-
-            p.vx -= ax * 1.5;
-            p.vy += ay * 1.5;
-            p.vx -= (p.x - targetX) * 0.1;
-            p.vy -= (p.y - targetY) * 0.1;
-            p.vx *= 0.8;
-            p.vy *= 0.8;
-            p.x += p.vx;
-            p.y += p.vy;
+            p.vx -= ax * 1.5; p.vy += ay * 1.5;
+            p.vx -= (p.x - offsets[i].x) * 0.1; p.vy -= (p.y - offsets[i].y) * 0.1;
+            p.vx *= 0.8; p.vy *= 0.8;
+            p.x += p.vx; p.y += p.vy;
 
             const dist = Math.hypot(p.x, p.y);
             if (dist > maxRadius) {
-                p.x = (p.x / dist) * maxRadius;
-                p.y = (p.y / dist) * maxRadius;
-                p.vx *= -0.4;
-                p.vy *= -0.4;
+                p.x = (p.x / dist) * maxRadius; p.y = (p.y / dist) * maxRadius;
+                p.vx *= -0.4; p.vy *= -0.4;
             }
-
             pupils[i].style.transform = `translate(${p.x}px, ${p.y}px)`;
         }
-        requestAnimationFrame(updatePhysics);
+        requestAnimationFrame(renderLoop);
+    }
+
+    function updateEyePosition(eyeElement, landmark) {
+        const rect = document.getElementById('app-container').getBoundingClientRect();
+        const vRatio = video.videoWidth / video.videoHeight;
+        const cRatio = rect.width / rect.height;
+        let rWidth, rHeight, ox, oy;
+
+        if (vRatio > cRatio) { rHeight = rect.height; rWidth = rect.height * vRatio; ox = (rect.width - rWidth) / 2; oy = 0; }
+        else { rWidth = rect.width; rHeight = rect.width / vRatio; ox = 0; oy = (rect.height - rHeight) / 2; }
+
+        // インカメラ用のX座標の反転処理を削除し、そのまま描画
+        const mappedX = ox + landmark.x * rWidth;
+        const mappedY = oy + landmark.y * rHeight;
+
+        eyeElement.style.left = mappedX + 'px';
+        eyeElement.style.top = mappedY + 'px';
     }
 
     async function startCamera() {
         try {
+            // facingModeを'environment'に戻す
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = stream;
         } catch(err) { alert('カメラエラー: ' + err.message); }
@@ -289,7 +291,7 @@
         }
         document.getElementById('start-screen').style.display = 'none';
         startCamera();
-        updatePhysics();
+        requestAnimationFrame(renderLoop);
     });
 
     document.getElementById('shutter-btn').addEventListener('click', () => {
@@ -303,6 +305,8 @@
         let dw, dh, ox, oy;
         if (vRatio > cRatio) { dh = canvas.height; dw = canvas.height * vRatio; ox = (canvas.width - dw) / 2; oy = 0; }
         else { dw = canvas.width; dh = canvas.width / vRatio; ox = 0; oy = (canvas.height - dh) / 2; }
+        
+        // 映像の反転描画を削除
         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, ox, oy, dw, dh);
 
         for (let i = 0; i < 2; i++) {
@@ -311,66 +315,27 @@
             const cy = eyeRect.top + eyeRect.height / 2;
             const radius = whiteSize / 2;
 
-            ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-            ctx.filter = 'blur(4px)';
-            ctx.beginPath();
-            ctx.arc(cx + 2, cy + 4, radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.save();
-            const capGrad = ctx.createRadialGradient(cx - radius*0.3, cy - radius*0.3, radius*0.1, cx, cy, radius);
-            capGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-            capGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
-            capGrad.addColorStop(1, 'rgba(0, 0, 0, 0.08)');
-            ctx.fillStyle = capGrad;
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-
-            const px = cx + physicsData[i].x;
-            const py = cy + physicsData[i].y;
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(px, py, blackSize / 2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.save(); ctx.fillStyle = 'rgba(0, 0, 0, 0.25)'; ctx.filter = 'blur(4px)'; ctx.beginPath(); ctx.arc(cx + 2, cy + 4, radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2); ctx.fill();
             
             ctx.save();
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.beginPath();
-            ctx.arc(px - blackSize*0.2, py - blackSize*0.2, blackSize * 0.2, 0, Math.PI * 2);
-            ctx.fill();
+            const capGrad = ctx.createRadialGradient(cx - radius*0.3, cy - radius*0.3, radius*0.1, cx, cy, radius);
+            capGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)'); capGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)'); capGrad.addColorStop(1, 'rgba(0, 0, 0, 0.08)');
+            ctx.fillStyle = capGrad; ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
             ctx.restore();
 
-            ctx.save();
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.filter = 'blur(1.5px)';
-            ctx.beginPath();
-            ctx.ellipse(cx - radius*0.4, cy - radius*0.4, radius*0.3, radius*0.2, -Math.PI/12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+            const px = cx + physicsData[i].x; const py = cy + physicsData[i].y;
+            ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(px, py, blackSize / 2, 0, Math.PI * 2); ctx.fill();
+            ctx.save(); ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctx.beginPath(); ctx.arc(px - blackSize*0.2, py - blackSize*0.2, blackSize * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            ctx.save(); ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; ctx.filter = 'blur(1.5px)'; ctx.beginPath(); ctx.ellipse(cx - radius*0.4, cy - radius*0.4, radius*0.3, radius*0.2, -Math.PI/12, 0, Math.PI * 2); ctx.fill(); ctx.restore();
         }
 
         document.getElementById('preview-img').src = canvas.toDataURL('image/jpeg', 0.9);
         document.getElementById('preview-screen').style.display = 'flex';
     });
 
-    document.getElementById('close-btn').addEventListener('click', () => {
-        document.getElementById('preview-screen').style.display = 'none';
-    });
-    document.getElementById('download-btn').addEventListener('click', () => {
-        const a = document.createElement('a');
-        a.href = document.getElementById('preview-img').src;
-        a.download = 'real_eye_sticker_photo.jpg';
-        a.click();
-    });
+    document.getElementById('close-btn').addEventListener('click', () => { document.getElementById('preview-screen').style.display = 'none'; });
+    document.getElementById('download-btn').addEventListener('click', () => { const a = document.createElement('a'); a.href = document.getElementById('preview-img').src; a.download = 'ar_eye_sticker.jpg'; a.click(); });
 </script>
 </body>
 </html>
