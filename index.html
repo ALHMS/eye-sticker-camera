@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>リアル目玉シールカメラ V5</title>
+    <title>リアル目玉シールカメラ V6</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -16,19 +16,20 @@
         /* コントロールパネル */
         #control-panel {
             position: absolute; top: 10px; left: 10px;
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(10px);
+            /* 透明度を上げ（0.3）、blurを1pxに変更 */
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(1px);
             padding: 12px; border-radius: 12px;
             display: flex; flex-direction: column; gap: 8px;
             z-index: 10; box-shadow: 0 6px 15px rgba(0,0,0,0.2);
             max-height: 80vh; overflow-y: auto; width: 220px;
         }
-        .panel-section { border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px; margin-bottom: 5px; }
-        .panel-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; display: block; }
+        .panel-section { border-bottom: 1px solid rgba(0,0,0,0.2); padding-bottom: 5px; margin-bottom: 5px; }
+        .panel-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #222; display: block; }
         
-        details.accordion { border-top: 1px solid rgba(0,0,0,0.1); padding-top: 5px; }
+        details.accordion { border-top: 1px solid rgba(0,0,0,0.2); padding-top: 5px; }
         details.accordion summary {
-            font-size: 12px; font-weight: bold; color: #555;
+            font-size: 12px; font-weight: bold; color: #222;
             cursor: pointer; outline: none; user-select: none; list-style: none;
         }
         details.accordion summary::-webkit-details-marker { display: none; }
@@ -38,38 +39,33 @@
 
         .slider-group {
             display: flex; align-items: center; justify-content: space-between;
-            font-size: 11px; font-weight: bold; color: #333; margin-bottom: 4px;
+            font-size: 11px; font-weight: bold; color: #111; margin-bottom: 4px;
         }
         .slider-group input { width: 100px; }
 
         /* --- リアル目玉シール (カプセル) --- */
         .eye {
             position: absolute;
-            /* カプセルの透明感と光沢をグラデーションで表現 */
             background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.12) 100%);
             border-radius: 50%;
-            /* 立体感を出すためのエッジ */
             border: 1px solid rgba(255, 255, 255, 0.3);
-            /* 立体的な影 */
             box-shadow: 2px 5px 15px rgba(0,0,0,0.5), inset 0 -3px 5px rgba(0,0,0,0.2);
             cursor: grab;
             transform: translate(-50%, -50%);
             z-index: 5;
-            overflow: visible; /* 擬似要素を表示するため */
+            overflow: visible;
         }
         
-        /* 擬似要素 ::before でカプセルの底にある白目を表現 */
         .eye::before {
             content: '';
             position: absolute;
-            top: 2px; left: 2px; right: 2px; bottom: 2px; /* borderの内側 */
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
             background: white;
             border-radius: 50%;
-            z-index: -1; /* カプセル(本体)の下に配置 */
-            box-shadow: inset 0 0 5px rgba(0,0,0,0.1); /* 白目の縁の影 */
+            z-index: -1;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
         }
 
-        /* 擬似要素 ::after でカプセル表面の強いハイライトを表現 */
         .eye::after {
             content: '';
             position: absolute;
@@ -77,9 +73,9 @@
             width: 30%; height: 30%;
             background: rgba(255, 255, 255, 0.8);
             border-radius: 50%;
-            filter: blur(1.5px); /* 少しぼかしてリアルに */
+            filter: blur(1.5px);
             transform: rotate(-15deg);
-            z-index: 10; /* 黒目の上に配置 */
+            z-index: 10;
             pointer-events: none;
         }
 
@@ -87,8 +83,7 @@
             position: absolute; background: black; border-radius: 50%;
             top: 50%; left: 50%;
             pointer-events: none;
-            z-index: 5; /* カプセル::beforeの上、::afterの下 */
-            /* 黒目の立体感 */
+            z-index: 5;
             box-shadow: inset 0 0 4px rgba(255,255,255,0.3);
         }
 
@@ -127,8 +122,8 @@
                 <input type="range" id="white-slider" min="10" max="120" value="80">
             </div>
             <div class="slider-group">
-                <label>黒目</label>
-                <input type="range" id="black-slider" min="5" max="100" value="40">
+                <label>黒目(割合)</label>
+                <input type="range" id="black-ratio-slider" min="10" max="90" value="50">
             </div>
         </div>
 
@@ -186,7 +181,7 @@
     let offsets = [ { x: 0, y: 0 }, { x: 0, y: 0 } ];
 
     const whiteSlider = document.getElementById('white-slider');
-    const blackSlider = document.getElementById('black-slider');
+    const blackRatioSlider = document.getElementById('black-ratio-slider');
     const lxS = document.getElementById('lx-slider');
     const lyS = document.getElementById('ly-slider');
     const rxS = document.getElementById('rx-slider');
@@ -198,11 +193,14 @@
 
     function updateParams() {
         whiteSize = parseInt(whiteSlider.value);
-        blackSize = parseInt(blackSlider.value);
         
+        // 白目のサイズとスライダーの割合(%)を掛け合わせて黒目のサイズを算出
+        const ratio = parseInt(blackRatioSlider.value) / 100;
+        blackSize = whiteSize * ratio;
+        
+        // カプセルをはみ出さないための最終セーフティ
         if (blackSize > whiteSize - 4) {
             blackSize = Math.max(2, whiteSize - 4);
-            blackSlider.value = blackSize;
         }
 
         offsets[0].x = (parseInt(lxS.value) / 100) * whiteSize;
@@ -223,7 +221,7 @@
         });
     }
 
-    [whiteSlider, blackSlider, lxS, lyS, rxS, ryS].forEach(s => s.addEventListener('input', updateParams));
+    [whiteSlider, blackRatioSlider, lxS, lyS, rxS, ryS].forEach(s => s.addEventListener('input', updateParams));
     updateParams();
 
     function makeDraggable(el) {
@@ -294,14 +292,12 @@
         updatePhysics();
     });
 
-    // シャッター（Canvas描画）をリアルな見た目にアップデート
     document.getElementById('shutter-btn').addEventListener('click', () => {
         const canvas = document.createElement('canvas');
         const rect = document.getElementById('app-container').getBoundingClientRect();
         canvas.width = rect.width; canvas.height = rect.height;
         const ctx = canvas.getContext('2d');
 
-        // ① カメラ映像描画
         const vRatio = video.videoWidth / video.videoHeight;
         const cRatio = canvas.width / canvas.height;
         let dw, dh, ox, oy;
@@ -309,41 +305,36 @@
         else { dw = canvas.width; dh = canvas.width / vRatio; ox = 0; oy = (canvas.height - dh) / 2; }
         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, ox, oy, dw, dh);
 
-        // ② 目玉（カプセル）描画
         for (let i = 0; i < 2; i++) {
             const eyeRect = eyes[i].getBoundingClientRect();
             const cx = eyeRect.left + eyeRect.width / 2;
             const cy = eyeRect.top + eyeRect.height / 2;
             const radius = whiteSize / 2;
 
-            // 1. カプセルの立体的な影（drop-shadow）を描画
             ctx.save();
             ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-            ctx.filter = 'blur(4px)'; // CSSのblurを模倣
+            ctx.filter = 'blur(4px)';
             ctx.beginPath();
-            ctx.arc(cx + 2, cy + 4, radius, 0, Math.PI * 2); // 影の位置をオフセット
+            ctx.arc(cx + 2, cy + 4, radius, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
-            // 2. 白目の底 (::before)
             ctx.fillStyle = 'white';
             ctx.beginPath();
-            ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2); // borderの内側
+            ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
             ctx.fill();
 
-            // 3. カプセル本体の透明感と光沢 (background: radial-gradient)
             ctx.save();
             const capGrad = ctx.createRadialGradient(cx - radius*0.3, cy - radius*0.3, radius*0.1, cx, cy, radius);
-            capGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)'); // 光沢
-            capGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)'); // 透明
-            capGrad.addColorStop(1, 'rgba(0, 0, 0, 0.08)'); // 影
+            capGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            capGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+            capGrad.addColorStop(1, 'rgba(0, 0, 0, 0.08)');
             ctx.fillStyle = capGrad;
             ctx.beginPath();
             ctx.arc(cx, cy, radius, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
-            // 4. 黒目 (.pupil)
             const px = cx + physicsData[i].x;
             const py = cy + physicsData[i].y;
             ctx.fillStyle = 'black';
@@ -351,7 +342,6 @@
             ctx.arc(px, py, blackSize / 2, 0, Math.PI * 2);
             ctx.fill();
             
-            // 黒目の立体感（軽いハイライト）
             ctx.save();
             ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.beginPath();
@@ -359,12 +349,10 @@
             ctx.fill();
             ctx.restore();
 
-            // 5. カプセル表面の強いハイライト (::after)
             ctx.save();
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.filter = 'blur(1.5px)'; // CSSのfilter: blur
+            ctx.filter = 'blur(1.5px)';
             ctx.beginPath();
-            // 左上にオフセットされた白い楕円
             ctx.ellipse(cx - radius*0.4, cy - radius*0.4, radius*0.3, radius*0.2, -Math.PI/12, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
