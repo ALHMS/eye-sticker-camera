@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>目玉シールカメラアプリ</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: sans-serif;
+            touch-action: none; /* スワイプによるスクロールを無効化 */
+        }
+        #app-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* カメラ映像 */
+        #camera-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 画面いっぱいに表示 */
+        }
+
+        /* コントロールパネル（半透明） */
+        #control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        .slider-group input {
+            margin-left: 10px;
+            width: 120px;
+        }
+
+        /* 目玉シール */
+        .eye {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            cursor: grab;
+            transform: translate(-50%, -50%); /* 中心座標を基準に配置 */
+            z-index: 5;
+        }
+        .eye:active {
+            cursor: grabbing;
+        }
+        
+        /* 黒目 */
+        .pupil {
+            position: absolute;
+            background: black;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            pointer-events: none; /* タッチイベントを親要素(白目)に透過させる */
+        }
+
+        /* シャッターボタン */
+        #shutter-btn {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 70px;
+            background: #fff;
+            border: 6px solid #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.1s;
+        }
+        #shutter-btn:active {
+            background: #eee;
+            transform: translateX(-50%) scale(0.95);
+        }
+
+        /* スタート画面（iOSのセンサー許可などを求めるため必須） */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        #start-btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            border: none;
+            background: #ffeb3b;
+            color: #333;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* 撮影結果プレビュー */
+        #preview-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        #preview-img {
+            max-width: 90%;
+            max-height: 75%;
+            border: 2px solid #fff;
+            border-radius: 10px;
+        }
+        .preview-controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        .preview-controls button {
+            padding: 10px 25px;
+            font-size: 16px;
+            border-radius: 25px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #close-btn { background: #e0e0e0; color: #333; }
+        #download-btn { background: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <video id="camera-video" autoplay playsinline></video>
+    
+    <div id="control-panel">
+        <div class="slider-group">
+            <label for="white-slider">白目サイズ</label>
+            <input type="range" id="white-slider" min="50" max="200" value="100">
+        </div>
+        <div class="slider-group">
+            <label for="black-slider">黒目サイズ</label>
+            <input type="range" id="black-slider" min="20" max="150" value="50">
+        </div>
+    </div>
+
+    <div id="eye1" class="eye" style="left: 30%; top: 40%;">
+        <div class="pupil" id="pupil1"></div>
+    </div>
+    <div id="eye2" class="eye" style="left: 70%; top: 40%;">
+        <div class="pupil" id="pupil2"></div>
+    </div>
+
+    <button id="shutter-btn"></button>
+
+    <div id="start-screen">
+        <button id="start-btn">スタート<br><small>(カメラとセンサーを許可)</small></button>
+    </div>
+
+    <div id="preview-screen">
+        <img id="preview-img" src="" alt="撮影結果">
+        <div class="preview-controls">
+            <button id="close-btn">戻る</button>
+            <button id="download-btn">画像を保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 状態変数
+    let whiteSize = 100;
+    let blackSize = 50;
+    
+    // DOM要素
+    const whiteSlider = document.getElementById('white-slider');
+    const blackSlider = document.getElementById('black-slider');
+    const eyes = [document.getElementById('eye1'), document.getElementById('eye2')];
+    const pupils = [document.getElementById('pupil1'), document.getElementById('pupil2')];
+    const video = document.getElementById('camera-video');
+
+    // サイズの更新関数
+    function updateSizes() {
+        whiteSize = parseInt(whiteSlider.value);
+        blackSize = parseInt(blackSlider.value);
+
+        // 黒目が白目より大きくならないように制限
+        if (blackSize > whiteSize - 10) {
+            blackSize = whiteSize - 10;
+            blackSlider.value = blackSize;
+        }
+
+        eyes.forEach(eye => {
+            eye.style.width = whiteSize + 'px';
+            eye.style.height = whiteSize + 'px';
+        });
+
+        pupils.forEach(pupil => {
+            pupil.style.width = blackSize + 'px';
+            pupil.style.height = blackSize + 'px';
+            pupil.style.marginTop = -(blackSize / 2) + 'px';
+            pupil.style.marginLeft = -(blackSize / 2) + 'px';
+        });
+    }
+
+    whiteSlider.addEventListener('input', updateSizes);
+    blackSlider.addEventListener('input', updateSizes);
+    updateSizes(); // 初期化
+
+    // ドラッグ処理の実装 (Pointer Events)
+    function makeDraggable(el) {
+        let isDragging = false;
+        el.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            el.setPointerCapture(e.pointerId);
+        });
+        el.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            el.style.left = e.clientX + 'px';
+            el.style.top = e.clientY + 'px';
+        });
+        el.addEventListener('pointerup', (e) => {
+            isDragging = false;
+            el.releasePointerCapture(e.pointerId);
+        });
+    }
+    eyes.forEach(makeDraggable);
+
+    // デバイスの加速度センサーによる黒目の揺れ（物理演算）
+    let ax = 0, ay = 0;
+    // 各黒目の位置と速度
+    const physicsData = [
+        { x: 0, y: 0, vx: 0, vy: 0 },
+        { x: 0, y: 0, vx: 0, vy: 0 }
+    ];
+
+    window.addEventListener('devicemotion', (e) => {
+        if (e.accelerationIncludingGravity) {
+            // デバイスを傾けた際の重力と振った際の加速度を反映
+            ax = e.accelerationIncludingGravity.x || 0;
+            ay = e.accelerationIncludingGravity.y || 0;
+        }
+    });
+
+    function updatePhysics() {
+        const maxRadius = (whiteSize - blackSize) / 2;
+
+        for (let i = 0; i < 2; i++) {
+            let p = physicsData[i];
+            
+            // X/Y軸の加速度を速度に加算（端末によって極性が違う場合がありますが、揺らす目的なのでOK）
+            p.vx -= ax * 0.8;
+            p.vy += ay * 0.8;
+
+            // 摩擦・減衰
+            p.vx *= 0.85;
+            p.vy *= 0.85;
+
+            // 位置の更新
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // 白目の枠内に収める処理（円の境界衝突）
+            const dist = Math.hypot(p.x, p.y);
+            if (dist > maxRadius) {
+                p.x = (p.x / dist) * maxRadius;
+                p.y = (p.y / dist) * maxRadius;
+                // 壁に当たったら少し跳ね返る
+                p.vx *= -0.5;
+                p.vy *= -0.5;
+            }
+
+            // DOMに反映
+            pupils[i].style.transform = `translate(${p.x}px, ${p.y}px)`;
+        }
+
+        requestAnimationFrame(updatePhysics);
+    }
+
+    // カメラの起動
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }, // 背面カメラを優先
+                audio: false
+            });
+            video.srcObject = stream;
+        } catch(err) {
+            alert('カメラの起動に失敗しました。権限が許可されているか確認してください。\n' + err.message);
+        }
+    }
+
+    // スタートボタンの処理（iOS13+のセンサー許可ダイアログ対応）
+    document.getElementById('start-btn').addEventListener('click', async () => {
+        // iOS 13+ で DeviceMotionEvent の許可が必要な場合
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            try {
+                const permissionState = await DeviceMotionEvent.requestPermission();
+                if (permissionState !== 'granted') {
+                    alert('センサーのアクセスが拒否されました。目玉は揺れません。');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        
+        document.getElementById('start-screen').style.display = 'none';
+        startCamera();
+        updatePhysics(); // 物理演算ループ開始
+    });
+
+    // 撮影処理（Canvasに動画とDOMを描画して合成）
+    document.getElementById('shutter-btn').addEventListener('click', () => {
+        const canvas = document.createElement('canvas');
+        const containerRect = document.getElementById('app-container').getBoundingClientRect();
+        
+        // Canvasサイズを現在の画面サイズに合わせる
+        canvas.width = containerRect.width;
+        canvas.height = containerRect.height;
+        const ctx = canvas.getContext('2d');
+
+        // ① 動画の描画 (object-fit: cover を模倣してCanvasに描画)
+        const vRatio = video.videoWidth / video.videoHeight;
+        const cRatio = canvas.width / canvas.height;
+        let drawWidth, drawHeight, offsetX, offsetY;
+
+        if (vRatio > cRatio) {
+            drawHeight = canvas.height;
+            drawWidth = canvas.height * vRatio;
+            offsetX = (canvas.width - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            drawWidth = canvas.width;
+            drawHeight = canvas.width / vRatio;
+            offsetX = 0;
+            offsetY = (canvas.height - drawHeight) / 2;
+        }
+        // 反転している場合などの考慮は省略（通常背面カメラは反転していない）
+        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, offsetX, offsetY, drawWidth, drawHeight);
+
+        // ② 目玉シールの描画
+        for (let i = 0; i < 2; i++) {
+            const eyeRect = eyes[i].getBoundingClientRect();
+            // 目玉の中心座標（画面上の絶対座標）
+            const cx = eyeRect.left + eyeRect.width / 2;
+            const cy = eyeRect.top + eyeRect.height / 2;
+
+            // 白目の描画
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(cx, cy, whiteSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 白目に軽い影をつける
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.stroke();
+
+            // 黒目の描画（物理演算のオフセット位置を加算）
+            const px = cx + physicsData[i].x;
+            const py = cy + physicsData[i].y;
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(px, py, blackSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // ③ 結果を画像にしてプレビュー画面に表示
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        document.getElementById('preview-img').src = dataUrl;
+        document.getElementById('preview-screen').style.display = 'flex';
+    });
+
+    // プレビューを閉じる
+    document.getElementById('close-btn').addEventListener('click', () => {
+        document.getElementById('preview-screen').style.display = 'none';
+    });
+
+    // 画像をダウンロード
+    document.getElementById('download-btn').addEventListener('click', () => {
+        const a = document.createElement('a');
+        a.href = document.getElementById('preview-img').src;
+        a.download = 'googly_eye_photo.jpg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    });
+
+</script>
+</body>
+</html>
